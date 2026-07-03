@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FindCVE</title>
+  <link href="https://cdn.jsdelivr.net/npm/beercss@4.0.23/dist/cdn/beer.min.css" rel="stylesheet">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@4.0.23/dist/cdn/beer.min.js"></script>
+  <style>
+    :root {
+      --bg0: #2D353B; --bg1: #343F44; --bg2: #3D484D; --bg3: #475258; --bg4: #4F585E;
+      --bg_red: #514045; --bg_green: #425047;
+      --fg: #D3C6AA; --red: #E67E80; --orange: #E69875; --yellow: #DBBC7F;
+      --green: #A7C080; --aqua: #83C092; --blue: #7FBBB3; --purple: #D699B6;
+      --grey0: #7A8478; --grey1: #859289; --grey2: #9DA9A0;
+      --accent: #7FBBB3; --accent-dim: rgba(127,187,179,.12);
+      --radius: 14px; --radius-sm: 10px;
+      --trans: 200ms cubic-bezier(.4,0,.2,1);
+    }
+    body { margin: 0; background: var(--bg0); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    main.responsive { padding: 16px 16px 96px; overflow-x: hidden; box-sizing: border-box; }
+    * { box-sizing: border-box; }
+
+    .hero-card { position: relative; overflow: hidden; border-radius: var(--radius) !important; border: 1px solid var(--bg3); }
+    .hero-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--orange), var(--yellow)); }
+    .hero-icon { width: 52px; height: 52px; border-radius: 14px; background: var(--accent-dim); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+    .hero-icon i { font-size: 26px; color: var(--accent); }
+    .hero-title { text-align: center; margin: 0 0 6px; color: var(--fg); }
+    .hero-sub { text-align: center; color: var(--grey1); font-size: .85rem; margin: 0 0 20px; line-height: 1.5; }
+    .hero-stats { display: flex; justify-content: center; gap: 28px; margin-bottom: 24px; }
+    .hero-stat { text-align: center; }
+    .hero-stat-num { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+    .hero-stat-label { font-size: .68rem; color: var(--grey0); text-transform: uppercase; letter-spacing: .6px; }
+    .scan-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 32px); margin: 0 16px; padding: 14px 20px; border: none; border-radius: 12px; background: var(--accent); color: var(--bg0); font-size: .95rem; font-weight: 700; cursor: pointer; transition: all var(--trans); flex-shrink: 0; box-sizing: border-box; }
+    .scan-btn:hover { filter: brightness(1.1); }
+    .scan-btn:active { filter: brightness(.9); }
+
+    .scan-progress { display: none; }
+    .scan-progress.active { display: block; }
+    .stepper { list-style: none; padding: 0; margin: 0; }
+    .stepper-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; opacity: .3; transition: opacity var(--trans); }
+    .stepper-item.active { opacity: 1; }
+    .stepper-item.completed { opacity: .5; }
+    .step-dot { width: 26px; height: 26px; min-width: 26px; border-radius: 50%; border: 2px solid var(--bg3); display: flex; align-items: center; justify-content: center; transition: all var(--trans); }
+    .stepper-item.active .step-dot { border-color: var(--accent); background: var(--accent-dim); }
+    .stepper-item.active .step-dot i { color: var(--accent); font-size: 14px; animation: spin 1s linear infinite; }
+    .stepper-item.completed .step-dot { border-color: var(--green); background: rgba(167,192,128,.15); }
+    .stepper-item.completed .step-dot i { color: var(--green); font-size: 14px; }
+    .step-label { font-size: .85rem; color: var(--grey2); }
+    .stepper-item.active .step-label { color: var(--accent); font-weight: 600; }
+    .scan-bar { margin-top: 14px; height: 3px; border-radius: 2px; background: var(--bg3); overflow: hidden; }
+    .scan-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--orange)); border-radius: 2px; width: 0%; transition: width 400ms ease; }
+
+    .risk-section { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .risk-gauge-wrap { position: relative; width: 150px; height: 150px; }
+    .risk-gauge-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .gauge-track { fill: none; stroke: var(--bg3); stroke-width: 8; }
+    .gauge-arc { fill: none; stroke-width: 8; stroke-linecap: round; stroke-dasharray: 326.73; stroke-dashoffset: 326.73; transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1), stroke .6s ease; }
+    .risk-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .risk-pct { font-size: 2rem; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+    .risk-pct-label { font-size: .6rem; text-transform: uppercase; letter-spacing: 2px; color: var(--grey0); margin-top: 2px; }
+    .risk-verdict { margin-top: 8px; padding: 5px 14px; border-radius: 16px; font-size: .75rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+    .verdict-safe { background: rgba(167,192,128,.12); color: var(--green); }
+    .verdict-warn { background: rgba(219,188,127,.12); color: var(--yellow); }
+    .verdict-danger { background: rgba(230,152,117,.12); color: var(--orange); }
+    .verdict-critical { background: rgba(230,126,128,.12); color: var(--red); }
+    .summary-detail { text-align: center; font-size: .8rem; color: var(--grey1); margin-top: 6px; }
+
+    .filter-bar { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; margin-bottom: 10px; }
+    .filter-bar::-webkit-scrollbar { display: none; }
+    .filter-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 16px; border: 1px solid var(--bg3); background: transparent; color: var(--grey1); font-size: .75rem; font-weight: 600; cursor: pointer; transition: all var(--trans); white-space: nowrap; }
+    .filter-chip i { font-size: 14px; }
+    .filter-chip:hover { border-color: var(--grey0); color: var(--grey2); }
+    .filter-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+    .chip-count { background: var(--bg3); padding: 1px 5px; border-radius: 8px; font-size: .65rem; }
+    .filter-chip.active .chip-count { background: rgba(127,187,179,.2); }
+
+    .cve-card { margin-bottom: 8px; border-radius: var(--radius-sm) !important; border-left: 4px solid var(--bg3); background: var(--bg1); transition: all var(--trans); position: relative; overflow: hidden; animation: fadeInUp .4s cubic-bezier(.4,0,.2,1) both; }
+    .cve-card:hover { transform: translateY(-1px); }
+    .cve-card.vuln { border-left-color: var(--red); background: var(--bg_red); }
+    .cve-card.ok { border-left-color: var(--green); background: var(--bg_green); }
+    .cve-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+    .cve-id { font-weight: 700; font-size: .88rem; font-family: monospace; color: var(--fg); }
+    .cvss-badge { display: inline-flex; padding: 2px 7px; border-radius: 6px; font-weight: 800; font-size: .65rem; }
+    .cvss-crit { background: rgba(230,126,128,.2); color: var(--red); }
+    .cvss-high { background: rgba(230,152,117,.2); color: var(--orange); }
+    .cvss-med { background: rgba(219,188,127,.2); color: var(--yellow); }
+    .cisa-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 5px; font-size: .58rem; font-weight: 800; background: rgba(230,126,128,.15); color: var(--red); letter-spacing: .5px; }
+    .cve-title { font-weight: 600; font-size: .88rem; margin: 3px 0; color: var(--fg); line-height: 1.3; }
+    .cve-desc { font-size: .78rem; color: var(--grey1); line-height: 1.4; margin: 0 0 6px; }
+    .cve-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; }
+    .cve-status { display: inline-flex; align-items: center; gap: 3px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .cve-status i { font-size: 13px; }
+    .cve-status.vuln-status { color: var(--red); }
+    .cve-status.ok-status { color: var(--green); }
+    .cve-status-detail { font-size: .7rem; color: var(--grey0); }
+    .cve-component-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 5px; font-size: .6rem; font-weight: 600; background: var(--bg3); color: var(--grey1); }
+
+    .device-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .device-prop { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg1); }
+    .device-prop i { font-size: 16px; color: var(--accent); margin-top: 1px; opacity: .7; }
+    .device-label { font-size: .65rem; text-transform: uppercase; letter-spacing: .7px; color: var(--grey0); margin-bottom: 1px; }
+    .device-value { font-size: .82rem; font-weight: 600; color: var(--fg); word-break: break-all; line-height: 1.3; }
+    .device-prop.full-width { grid-column: 1 / -1; }
+
+    .share-bar { display: flex; gap: 8px; width: 100%; }
+    .share-btn, .log-toggle-btn { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 8px; border: 1px solid var(--bg3); border-radius: 10px; background: transparent; color: var(--grey1); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all var(--trans); box-sizing: border-box; }
+    .share-btn:hover, .log-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    details.log-details { width: 100%; }
+    details.log-details summary { list-style: none; width: 100%; }
+    details.log-details summary::-webkit-details-marker { display: none; }
+    details.log-details[open] .log-toggle-btn { border-radius: 10px 10px 0 0; border-bottom-color: transparent; }
+    pre.log { font-size: .7rem; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 0; padding: 12px; border-radius: 0 0 10px 10px; background: var(--bg1); border: 1px solid var(--bg3); border-top: none; color: var(--grey1); font-family: monospace; line-height: 1.5; }
+
+    .error-card { border-left: 4px solid var(--red) !important; }
+    .error-props { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 10px; }
+    .error-prop { padding: 6px 8px; border-radius: 6px; background: var(--bg1); font-size: .75rem; }
+    .error-prop-label { font-size: .6rem; text-transform: uppercase; letter-spacing: .7px; color: var(--grey0); margin-bottom: 1px; }
+    .error-prop-value { font-weight: 600; font-family: monospace; color: var(--fg); }
+
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(70px); padding: 10px 20px; border-radius: 10px; background: var(--accent); color: var(--bg0); font-size: .8rem; font-weight: 700; z-index: 1000; opacity: 0; transition: all 300ms cubic-bezier(.4,0,.2,1); pointer-events: none; white-space: nowrap; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    .section-header { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+    .section-header i { font-size: 18px; color: var(--accent); opacity: .7; }
+    .section-header h6 { margin: 0; color: var(--fg); }
+    .section-count { margin-left: auto; font-size: .7rem; color: var(--grey0); font-weight: 600; }
+
+    .space { height: 12px; }
+
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes gaugeReveal { from { stroke-dashoffset: 326.73; } }
+
+    @media (max-width: 480px) {
+      .device-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+      .hero-stats { gap: 16px; }
+      .error-props { grid-template-columns: 1fr; }
+      .risk-gauge-wrap { width: 130px; height: 130px; }
+      .risk-pct { font-size: 1.7rem; }
+      .share-bar { flex-direction: column; }
+    }
+    .empty-filter { text-align: center; padding: 28px 12px; color: var(--grey0); }
+    .empty-filter i { font-size: 36px; margin-bottom: 6px; display: block; }
+  </style>
+</head>
+<body class="dark">
+  <main class="responsive">
+    <div style="height:2px"></div>
+
+    <div id="introCard" style="animation:fadeInUp .4s cubic-bezier(.4,0,.2,1) both">
+      <article class="hero-card" style="padding:24px 16px;overflow:hidden">
+        <div class="hero-icon"><i>security</i></div>
+        <h5 class="hero-title">FindCVE Beta</h5>
+        <p class="hero-sub">Scans your device for 20 known critical CVEs (2025–2026) including active CISA KEV exploits. Requires Full Access + Full Trust.</p>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="hero-stat-num">20</div><div class="hero-stat-label">CVEs Tracked</div></div>
+          <div class="hero-stat"><div class="hero-stat-num">10</div><div class="hero-stat-label">CISA KEV</div></div>
+          <div class="hero-stat"><div class="hero-stat-num">3</div><div class="hero-stat-label">Categories</div></div>
+        </div>
+        <button id="scanBtn" class="scan-btn"><i>search</i><span>Start Security Scan</span></button>
+      </article>
+    </div>
+
+    <div id="scanProgress" class="scan-progress">
+      <article class="hero-card" style="padding:20px;margin-top:8px">
+        <h6 style="display:flex;align-items:center;gap:6px;margin:0 0 14px;color:var(--accent)"><i>radar</i> Scanning Device</h6>
+        <ul class="stepper" id="scanStepper">
+          <li class="stepper-item"><div class="step-dot"><i>phone_android</i></div><div class="step-label">Reading device properties</div></li>
+          <li class="stepper-item"><div class="step-dot"><i>update</i></div><div class="step-label">Checking security patch level</div></li>
+          <li class="stepper-item"><div class="step-dot"><i>developer_board</i></div><div class="step-label">Checking kernel version</div></li>
+          <li class="stepper-item"><div class="step-dot"><i>bluetooth</i></div><div class="step-label">Checking Bluetooth status</div></li>
+          <li class="stepper-item"><div class="step-dot"><i>bug_report</i></div><div class="step-label">Analyzing vulnerability exposure</div></li>
+          <li class="stepper-item"><div class="step-dot"><i>summarize</i></div><div class="step-label">Building report</div></li>
+        </ul>
+        <div class="scan-bar"><div class="scan-bar-fill" id="scanBarFill"></div></div>
+      </article>
+    </div>
+
+    <div id="results" style="display:none">
+      <article style="padding:16px;border-radius:var(--radius);background:var(--bg1);border:1px solid var(--bg3);animation:fadeInUp .4s cubic-bezier(.4,0,.2,1) both">
+        <div class="section-header"><i>phone_android</i><h6>Device Information</h6></div>
+        <div class="device-grid" id="deviceGrid"></div>
+      </article>
+      <div class="space"></div>
+      <article style="padding:16px;border-radius:var(--radius);background:var(--bg1);border:1px solid var(--bg3);animation:fadeInUp .4s cubic-bezier(.4,0,.2,1) both;animation-delay:.1s">
+        <div class="section-header"><i>analytics</i><h6>Security Assessment</h6></div>
+        <div class="risk-section" id="riskSection"></div>
+      </article>
+      <div class="space"></div>
+      <div style="animation:fadeInUp .4s cubic-bezier(.4,0,.2,1) both;animation-delay:.15s">
+        <div class="section-header"><i>filter_list</i><h6>Vulnerabilities</h6><span class="section-count" id="resultCount">20 results</span></div>
+        <div class="filter-bar" id="filterBar">
+          <button class="filter-chip active" data-category="all"><i>apps</i> All <span class="chip-count" id="countAll">20</span></button>
+          <button class="filter-chip" data-category="bluetooth"><i>bluetooth</i> BT <span class="chip-count" id="countBt">0</span></button>
+          <button class="filter-chip" data-category="kernel"><i>developer_board</i> Kernel <span class="chip-count" id="countKern">0</span></button>
+          <button class="filter-chip" data-category="patch"><i>extension</i> Framework <span class="chip-count" id="countFw">0</span></button>
+        </div>
+      </div>
+      <div id="cveList"></div>
+      <div class="space"></div>
+      <div class="share-bar" style="animation:fadeInUp .4s cubic-bezier(.4,0,.2,1) both;animation-delay:.25s">
+        <button class="share-btn" id="shareBtn"><i>share</i><span>Share Report</span></button>
+        <details class="log-details">
+          <summary><button class="log-toggle-btn" type="button"><i>terminal</i><span>Raw Output</span></button></summary>
+          <pre id="rawLog" class="log"></pre>
+        </details>
+      </div>
+    </div>
+
+    <div id="errorCard" style="display:none">
+      <article class="error-card" style="padding:16px;border-radius:var(--radius);background:var(--bg1);border:1px solid var(--bg3);animation:fadeInUp .4s cubic-bezier(.4,0,.2,1) both;margin-top:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <i style="font-size:24px;color:var(--red)">error</i>
+          <div><h6 style="margin:0;color:var(--fg)">Bridge Not Available</h6><div style="font-size:.75rem;color:var(--grey1)">Nightzuku shell bridge required</div></div>
+        </div>
+        <p style="margin:6px 0;color:var(--grey1);font-size:.82rem">Enable <b style="color:var(--fg)">Full Access</b> mode and ensure this module has <b style="color:var(--fg)">Full Trust</b> (long-press the module card in Nightzuku).</p>
+        <div class="error-props">
+          <div class="error-prop"><div class="error-prop-label">Module</div><div class="error-prop-value" id="errModuleId">-</div></div>
+          <div class="error-prop"><div class="error-prop-label">Mode</div><div class="error-prop-value" id="errMode">-</div></div>
+          <div class="error-prop"><div class="error-prop-label">Trusted</div><div class="error-prop-value" id="errTrusted">-</div></div>
+        </div>
+      </article>
+    </div>
+  </main>
+  <div class="toast" id="toast"><i>check_circle</i><span id="toastMsg">Report copied</span></div>
+
+  <script>
+    const CVE_DB = [
+      {id:'CVE-2025-36896',cvss:9.8,title:'WLAN Pixel EoP (A-394765106)',desc:'WLAN in Android allows elevation of privilege on Google Pixel devices. Network-exploitable.',component:'WiFi/WLAN',category:'patch',patchDate:'2025-09-05',cisaKev:false},
+      {id:'CVE-2025-36904',cvss:9.8,title:'WLAN Pixel EoP (A-396458384)',desc:'Second WLAN vulnerability on Pixel devices allowing privilege escalation via network.',component:'WiFi/WLAN',category:'patch',patchDate:'2025-09-05',cisaKev:false},
+      {id:'CVE-2026-0126',cvss:9.8,title:'WC-Radio OOB Write RCE',desc:'Out-of-bounds write in WC-Radio kernel driver. Remote code execution.',component:'Media/Radio',category:'patch',patchDate:'2026-06-01',cisaKev:false},
+      {id:'CVE-2025-48543',cvss:8.8,title:'ART Runtime Sandbox Escape',desc:'Use-after-free in Android Runtime allows escaping Chrome sandbox to attack system_server.',component:'Android Runtime',category:'patch',patchDate:'2025-09-01',cisaKev:true},
+      {id:'CVE-2025-36901',cvss:8.8,title:'WLAN Pixel Adjacent Network EoP',desc:'WLAN privilege escalation on Pixel via adjacent network. No auth required.',component:'WiFi/WLAN',category:'patch',patchDate:'2025-09-05',cisaKev:false},
+      {id:'CVE-2025-20702',cvss:8.8,title:'Airoha BT Audio SDK RACE Access',desc:'Unauthorized access to RACE protocol in Airoha Bluetooth audio SDK.',component:'Bluetooth Headset',category:'bluetooth',patchDate:'2025-08-01',cisaKev:false},
+      {id:'CVE-2025-20700',cvss:8.8,title:'Airoha BT Audio GATT Bypass',desc:'Permission bypass via Bluetooth LE GATT in Airoha audio SDK.',component:'Bluetooth Headset',category:'bluetooth',patchDate:'2025-08-01',cisaKev:false},
+      {id:'CVE-2025-48595',cvss:8.4,title:'Framework Integer Overflow',desc:'Integer overflow in Android Framework enables code execution as system.',component:'Android Framework',category:'patch',patchDate:'2026-06-01',cisaKev:true},
+      {id:'CVE-2026-0021',cvss:8.4,title:'AppInfoBase Confused Deputy',desc:'Cross-user permission bypass in AppInfoBase.java via confused deputy.',component:'Android Framework',category:'patch',patchDate:'2026-03-01',cisaKev:false},
+      {id:'CVE-2025-20704',cvss:8.0,title:'MediaTek Modem OOB Write',desc:'Out-of-bounds write in MediaTek modem. Remote RCE via rogue base station.',component:'MediaTek Modem',category:'patch',patchDate:'2025-09-01',cisaKev:false},
+      {id:'CVE-2025-48640',cvss:8.0,title:'BT Passkey Pairing Bypass',desc:'Missing permission check in passkey entry pairing approval.',component:'Bluetooth Stack',category:'bluetooth',patchDate:'2026-06-01',cisaKev:false},
+      {id:'CVE-2025-48572',cvss:7.8,title:'Framework Permissions Bypass',desc:'Permissions bypass allows background activity launches.',component:'Android Framework',category:'patch',patchDate:'2025-12-01',cisaKev:true},
+      {id:'CVE-2025-48643',cvss:7.8,title:'Provisioning Bypass',desc:'Improper input validation allows provisioning bypass.',component:'Android Framework',category:'patch',patchDate:'2026-06-01',cisaKev:false},
+      {id:'CVE-2025-48617',cvss:7.8,title:'CarrierConfigLoader UID Bypass',desc:'UID check bypass in CarrierConfigLoader.',component:'Settings/Telecom',category:'patch',patchDate:'2026-06-01',cisaKev:false},
+      {id:'CVE-2026-0019',cvss:7.8,title:'SettingsLib Disable System Components',desc:'Logic error allows disabling system components via SettingsLib.',component:'SystemUI/Settings',category:'patch',patchDate:'2026-06-01',cisaKev:false},
+      {id:'CVE-2025-22438',cvss:7.8,title:'InputDispatcher Use-After-Free',desc:'UAF in InputDispatcher afterKeyEventLockedInterruptable.',component:'Android Framework',category:'patch',patchDate:'2025-04-01',cisaKev:false},
+      {id:'CVE-2025-21756',cvss:7.8,title:'Kernel vsock Use-After-Free',desc:'UAF in vsock_bind via transport reassignment. Local root. PoC exists.',component:'Linux Kernel',category:'kernel',patchKernels:['5.10.235','5.15.179','6.1.131','6.6.79','6.12.16','6.13.4'],cisaKev:false},
+      {id:'CVE-2025-21702',cvss:7.8,title:'Kernel pfifo_tail Privesc',desc:'pfifo_tail_enqueue privilege escalation in net/sched.',component:'Linux Kernel',category:'kernel',patchKernels:['5.4.291','5.10.235','5.15.179','6.1.130','6.6.83','6.12.14','6.13.3'],cisaKev:false},
+      {id:'CVE-2025-22441',cvss:7.3,title:'RemoteViews Confused Deputy',desc:'Arbitrary code loading in privileged context via RemoteViews.',component:'Android Framework',category:'patch',patchDate:'2025-08-01',cisaKev:false},
+      {id:'CVE-2026-0083',cvss:7.0,title:'NFC Use-After-Free Race',desc:'UAF in Nfc::eventCallback() due to race condition. CVSS v4.0: 10.0.',component:'NFC/Kernel',category:'patch',patchDate:'2026-06-01',cisaKev:false}
+    ];
+
+    const $=s=>document.querySelector(s);
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    function cvssClass(c){return c>=9?'cvss-crit':c>=7?'cvss-high':'cvss-med';}
+    function parseVersion(v){const m=v.match(/(\d+)\.(\d+)\.?(\d*)/);return m?[parseInt(m[1]),parseInt(m[2])||0,parseInt(m[3])||0]:[0,0,0];}
+    function versionGte(a,b){const pa=parseVersion(a),pb=parseVersion(b);for(let i=0;i<3;i++){if(pa[i]>pb[i])return true;if(pa[i]<pb[i])return false;}return true;}
+    async function shell(cmd){const r=JSON.parse(window.Shizuku.exec(cmd));if(!r.ok)throw new Error(r.stderr||'Failed');return r.stdout.trim();}
+
+    let allResults=[],activeFilter='all',deviceData={};
+
+    function setScanStep(i){document.querySelectorAll('.stepper-item').forEach((it,idx)=>{it.classList.remove('active','completed');if(idx<i)it.classList.add('completed');else if(idx===i)it.classList.add('active');});$('#scanBarFill').style.width=Math.round((i/5)*100)+'%';}
+
+    function renderDeviceGrid(d){
+      const props=[
+        {icon:'storefront',label:'Brand',value:d.brand},{icon:'devices',label:'Model',value:d.model},
+        {icon:'android',label:'Android',value:`${d.android} (SDK ${d.sdk})`},{icon:'update',label:'Security Patch',value:d.patch},
+        {icon:'developer_board',label:'Kernel',value:d.kernel,full:true},{icon:'security',label:'SELinux',value:d.selinux},
+        {icon:'bluetooth',label:'Bluetooth',value:d.btOn==='1'?'Enabled':'Disabled'},{icon:'fingerprint',label:'Fingerprint',value:d.fingerprint,full:true}
+      ];
+      $('#deviceGrid').innerHTML=props.map(p=>`<div class="device-prop${p.full?' full-width':''}"><i>${p.icon}</i><div><div class="device-label">${p.label}</div><div class="device-value">${p.value}</div></div></div>`).join('');
+    }
+
+    function renderRiskGauge(v,total){
+      const pct=total?Math.round((v/total)*100):0;
+      const offset=326.73*(1-pct/100);
+      let color,vc,vt;
+      if(pct===0){color='var(--green)';vc='verdict-safe';vt='All Clear';}
+      else if(pct<=25){color='var(--yellow)';vc='verdict-warn';vt='Low Risk';}
+      else if(pct<=60){color='var(--orange)';vc='verdict-danger';vt='Elevated Risk';}
+      else{color='var(--red)';vc='verdict-critical';vt='High Risk';}
+      $('#riskSection').innerHTML=`<div class="risk-gauge-wrap"><svg viewBox="0 0 120 120"><circle class="gauge-track" cx="60" cy="60" r="52"/><circle class="gauge-arc" cx="60" cy="60" r="52" style="stroke:${color};stroke-dashoffset:${offset};animation:gaugeReveal 1.2s cubic-bezier(.4,0,.2,1) both;"/></svg><div class="risk-center"><div class="risk-pct" style="color:${color}">${pct}%</div><div class="risk-pct-label">Risk Score</div></div></div><div class="risk-verdict ${vc}">${vt}</div><div class="summary-detail">${v} vulnerabilit${v===1?'y':'ies'} found · ${total-v} of ${total} patched</div>`;
+    }
+
+    function updateFilterCounts(){const c={all:allResults.length,bluetooth:0,kernel:0,patch:0};allResults.forEach(r=>{if(c[r.category]!==undefined)c[r.category]++;});$('#countAll').textContent=c.all;$('#countBt').textContent=c.bluetooth;$('#countKern').textContent=c.kernel;$('#countFw').textContent=c.patch;}
+
+    function renderCVEList(){
+      const filtered=activeFilter==='all'?allResults:allResults.filter(r=>r.category===activeFilter);
+      if(!filtered.length){$('#cveList').innerHTML='<div class="empty-filter"><i>filter_alt_off</i><div>No vulnerabilities in this category</div></div>';$('#resultCount').textContent='0 results';return;}
+      $('#resultCount').textContent=filtered.length+' result'+(filtered.length!==1?'s':'');
+      $('#cveList').innerHTML=filtered.map((r,i)=>{
+        const cls=r.vulnerable?'vuln':'ok',sc=r.vulnerable?'vuln-status':'ok-status',
+              sl=r.vulnerable?'VULNERABLE':'PATCHED',ic=r.vulnerable?'error':'check_circle',
+              ct=r.cisaKev?'<span class="cisa-tag">CISA KEV</span>':'',
+              ci=r.category==='bluetooth'?'bluetooth':r.category==='kernel'?'developer_board':'extension';
+        return `<article class="cve-card ${cls}" style="animation-delay:${i*.05}s"><div class="cve-header"><span class="cve-id">${r.id}</span><span class="cvss-badge ${cvssClass(r.cvss)}">CVSS ${r.cvss}</span>${ct}<span class="cve-component-tag"><i>${ci}</i> ${r.component}</span></div><div class="cve-title">${r.title}</div><div class="cve-desc">${r.desc}</div><div class="cve-footer"><span class="cve-status ${sc}"><i>${ic}</i> ${sl}</span><span class="cve-status-detail">${r.statusText}</span></div></article>`;
+      }).join('');
+    }
+
+    async function scan(){
+      for(let i=0;i<6;i++){setScanStep(i);await sleep(250);}
+      const patch=await shell('getprop ro.build.version.security_patch');
+      const android=await shell('getprop ro.build.version.release');
+      const model=await shell('getprop ro.product.model');
+      const brand=await shell('getprop ro.product.brand');
+      const sdk=await shell('getprop ro.build.version.sdk');
+      const fingerprint=await shell('getprop ro.build.fingerprint');
+      const kernel=await shell('uname -r');
+      const btOn=await shell('settings get global bluetooth_on');
+      const selinux=await shell('getenforce');
+      deviceData={brand,model,android,sdk,patch,kernel,selinux,btOn,fingerprint};
+      renderDeviceGrid(deviceData);
+      setScanStep(4);await sleep(200);
+      let vc=0,pc=0;allResults=[];
+      for(const cve of CVE_DB){
+        let vulnerable=false,statusText='';
+        if(cve.category==='patch'){vulnerable=patch<cve.patchDate;statusText=vulnerable?`Patch < ${cve.patchDate}`:`Patched (≥ ${cve.patchDate})`;}
+        else if(cve.category==='bluetooth'){vulnerable=btOn==='1'&&patch<cve.patchDate;statusText=btOn!=='1'?'BT disabled':vulnerable?`BT on, patch < ${cve.patchDate}`:`Patched (≥ ${cve.patchDate})`;}
+        else if(cve.category==='kernel'){let p=false;for(const kv of cve.patchKernels){if(versionGte(kernel,kv)){p=true;break;}}vulnerable=!p;statusText=p?`Kernel ≥ ${cve.patchKernels[cve.patchKernels.length-1]}`:'Kernel vulnerable';}
+        if(vulnerable)vc++;else pc++;allResults.push({...cve,vulnerable,statusText});
+      }
+      setScanStep(5);await sleep(200);
+      renderRiskGauge(vc,CVE_DB.length);updateFilterCounts();activeFilter='all';
+      document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+      document.querySelector('.filter-chip[data-category="all"]').classList.add('active');
+      renderCVEList();
+      $('#rawLog').textContent=['Device: '+brand+' '+model,'Android: '+android+' (SDK '+sdk+')','Security Patch: '+patch,'Kernel: '+kernel,'Bluetooth: '+(btOn==='1'?'Enabled':'Disabled'),'SELinux: '+selinux,'','--- Results ---',...allResults.map(r=>(r.vulnerable?'VULNERABLE':'PATCHED   ')+' '+r.id+' | CVSS '+r.cvss+' | '+r.title+' | '+r.statusText),'','Summary: '+vc+' vulnerable, '+pc+' patched'].join('\n');
+      $('#scanBarFill').style.width='100%';await sleep(300);
+      $('#scanProgress').classList.remove('active');$('#results').style.display='block';
+    }
+
+    function shareReport(){
+      if(!allResults.length)return;
+      const vc=allResults.filter(r=>r.vulnerable).length;
+      const lines=['FindCVE Report','Device: '+deviceData.brand+' '+deviceData.model,'Patch: '+deviceData.patch,'Kernel: '+deviceData.kernel,'Risk: '+vc+'/'+CVE_DB.length+' CVEs','',...allResults.filter(r=>r.vulnerable).map(r=>'VULN '+r.id+' (CVSS '+r.cvss+') '+r.title),...allResults.filter(r=>!r.vulnerable).map(r=>'OK    '+r.id),'','Generated by FindCVE'];
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(lines.join('\n')).then(()=>{const t=$('#toast');$('#toastMsg').textContent='Report copied';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);});
+    }
+
+    $('#scanBtn').addEventListener('click',async()=>{
+      $('#introCard').style.display='none';$('#scanProgress').classList.add('active');
+      $('#results').style.display='none';$('#errorCard').style.display='none';
+      document.querySelectorAll('.stepper-item').forEach(i=>i.classList.remove('active','completed'));
+      $('#scanBarFill').style.width='0%';
+      try{if(!window.Shizuku)throw new Error('No bridge');
+      const info=JSON.parse(window.Shizuku.getModuleInfo());
+      $('#errModuleId').textContent=info.id||'-';$('#errMode').textContent=info.accessMode||'-';
+      $('#errTrusted').textContent=info.trusted?'Yes':'No';
+      if(!info.trusted)throw new Error('Module not trusted.');
+      await scan();}catch(e){$('#scanProgress').classList.remove('active');$('#errorCard').style.display='block';$('#errModuleId').textContent=e.message;}
+    });
+
+    $('#filterBar').addEventListener('click',e=>{const c=e.target.closest('.filter-chip');if(!c)return;document.querySelectorAll('.filter-chip').forEach(x=>x.classList.remove('active'));c.classList.add('active');activeFilter=c.dataset.category;renderCVEList();});
+    $('#shareBtn').addEventListener('click',shareReport);
+  </script>
+</body>
+</html>

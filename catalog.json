@@ -1,0 +1,15 @@
+{
+  "catalogVersion": 1,
+  "modules": [
+    {
+      "id": "findcve",
+      "name": "FindCVE",
+      "repo": "kerneldroid/nightzuku-modules",
+      "sourcePath": "modules/findcve",
+      "defaultBranch": "main",
+      "description": "Android CVE scanner. Checks security patch level, kernel version, and Bluetooth status against known vulnerabilities. Includes WebUI dashboard.",
+      "author": "kerneldroid",
+      "releaseTag": null
+    }
+  ]
+}

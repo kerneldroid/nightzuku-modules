@@ -1,0 +1,11 @@
+id=findcve
+name=FindCVE
+version=2.1.0
+versionCode=3
+author=kerneldroid
+description=Android CVE scanner. Checks security patch level, kernel version, and Bluetooth status against known vulnerabilities. Includes WebUI dashboard.
+webui=webui
+usesShellBridge=true
+action=action.sh
+banner=banner.png
+repoUrl=https://github.com/kerneldroid/nightzuku-modules

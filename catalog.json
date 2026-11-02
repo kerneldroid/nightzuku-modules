@@ -10,6 +10,16 @@
       "description": "Android CVE scanner. Checks security patch level, kernel version, and Bluetooth status against known vulnerabilities. Includes WebUI dashboard.",
       "author": "kerneldroid",
       "releaseTag": null
+    },
+    {
+      "id": "metro-tracker-inspector",
+      "name": "Metro Tracker Inspector",
+      "repo": "kerneldroid/nightzuku-modules",
+      "sourcePath": "modules/metro-tracker-inspector",
+      "defaultBranch": "main",
+      "description": "Deep multi-layer tracker scanner for installed Android applications (Manifest components, DEX bytecode classes, native .so libraries, SDK metadata, and telemetry permissions) with a Windows 8 Metro UI in Material 3 palette and JSON export.",
+      "author": "kerneldroid",
+      "releaseTag": null
     }
   ]
 }

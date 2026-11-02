@@ -7,6 +7,7 @@ ADB modules for the [Nightzuku](https://github.com/kerneldroid/Nightzuku) module
 | Module | Description |
 |--------|-------------|
 | [findcve](modules/findcve/) | Android CVE scanner — checks security patch, kernel, Bluetooth for known vulnerabilities |
+| [metro-tracker-inspector](modules/metro-tracker-inspector/) | Deep tracker scanner — audits manifest components, DEX bytecode, native libraries, SDK metadata and telemetry permissions with a Metro WebUI |
 
 ## Installation
 

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en" data-palette="m3-violet-dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tracker Inspector</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="nightzuku-guard.js"></script>
+</head>
+<body>
+  <div id="topProgress" class="metro-top-progress">
+    <div id="topProgressFill" class="metro-top-progress-fill"></div>
+  </div>
+
+  <div id="metroToast" class="metro-toast" role="status" aria-live="polite"></div>
+
+  <div class="metro-shell">
+    <!-- Clean Windows 8 Header -->
+    <header class="metro-header">
+      <h1 class="metro-title">tracker inspector</h1>
+      <div class="metro-meta-box">
+        <div class="metro-meta-author">kerneldroid [Official]</div>
+        <div class="metro-meta-hw" id="hwBadgeLabel">Detecting hardware...</div>
+      </div>
+    </header>
+
+    <!-- Windows 8 Pivot Navigation (4 streamlined views) -->
+    <nav class="metro-pivot-nav" aria-label="Navigation">
+      <button class="metro-pivot-btn active" data-pivot="scanner" type="button">scanner</button>
+      <button class="metro-pivot-btn" data-pivot="packages" type="button">packages</button>
+      <button class="metro-pivot-btn" data-pivot="config" type="button">config</button>
+      <button class="metro-pivot-btn" data-pivot="json" type="button">json</button>
+    </nav>
+
+    <!-- ==================== PIVOT 1: UNIFIED SCANNER & RESULTS ==================== -->
+    <section id="pane-scanner" class="metro-pane active">
+      <!-- Compact 4-Tile Windows 8 Control Grid -->
+      <div class="metro-tile-grid">
+        <button id="tileStartScan" class="metro-tile wide tile-primary-solid" type="button">
+          <div class="tile-top-row">
+            <div>
+              <div class="tile-headline" id="tileScanHeadline">Start Deep Scan</div>
+              <div class="tile-subtext" id="tileScanSubtext">All user apps • 4 inspection layers</div>
+            </div>
+            <svg class="tile-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </div>
+          <div class="tile-footer">
+            <span id="tileScanFooterMode">Scope: All User Apps</span>
+            <span id="tileScanActionHint">RUN</span>
+          </div>
+        </button>
+
+        <button id="tileModeSwitch" class="metro-tile tile-secondary" type="button">
+          <div class="tile-top-row">
+            <div class="tile-big-number" id="metricScannedApps">0</div>
+          </div>
+          <div class="tile-footer">
+            <span>scanned</span>
+            <span id="metricInstalledTotal">0 total</span>
+          </div>
+        </button>
+
+        <button id="tileTrackersMetric" class="metro-tile tile-tertiary" type="button">
+          <div class="tile-top-row">
+            <div class="tile-big-number" id="metricTotalTrackers">0</div>
+          </div>
+          <div class="tile-footer">
+            <span>trackers</span>
+            <span id="metricInfectedApps">0 apps</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Status & Progress Strip -->
+      <div id="scanStatusStrip" class="metro-status-strip">
+        <div class="metro-status-head">
+          <span id="scanStatusTitle">Ready</span>
+          <strong id="scanStatusPercent">0%</strong>
+        </div>
+        <div class="metro-status-pkg" id="scanStatusDetail">Select "Start Deep Scan" or choose specific apps in "packages"</div>
+        <div class="metro-progress-track">
+          <div id="scanProgressBar" class="metro-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- Instant Filter & Sort Controls -->
+      <div class="metro-filter-bar">
+        <input id="searchResultsInput" class="metro-input" type="search" placeholder="Search scanned apps or tracker names...">
+        <select id="filterRiskSelect" class="metro-select" aria-label="Filter results">
+          <option value="all">All Scanned</option>
+          <option value="tracked">With Trackers (&gt;0)</option>
+          <option value="high">High Risk</option>
+          <option value="clean">Clean (0)</option>
+        </select>
+        <select id="sortResultsSelect" class="metro-select" aria-label="Sort results">
+          <option value="trackers_desc">Most Trackers</option>
+          <option value="risk_desc">Highest Risk</option>
+          <option value="pkg_asc">Name (A–Z)</option>
+        </select>
+      </div>
+
+      <!-- Results List -->
+      <div id="resultsListContainer" class="metro-app-list">
+        <div class="metro-empty-state">
+          No applications scanned yet. Tap <strong>Start Deep Scan</strong> above or pick a single app in the <strong>packages</strong> tab.
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PIVOT 2: PACKAGES (SINGLE OR MULTI SELECT) ==================== -->
+    <section id="pane-packages" class="metro-pane">
+      <div class="metro-filter-bar">
+        <input id="searchPkgSelectorInput" class="metro-input" type="search" placeholder="Filter installed packages...">
+        <button id="btnScanSelectedPkgs" class="metro-btn primary" type="button">Scan Selected (0)</button>
+        <button id="btnSelectAllPkgs" class="metro-btn" type="button">All</button>
+        <button id="btnClearAllPkgs" class="metro-btn" type="button">None</button>
+        <button id="btnRefreshPackages" class="metro-btn" type="button">Reload</button>
+      </div>
+
+      <div class="metro-subbar">
+        <span id="pkgSelectorCaption">0 packages</span>
+        <span>Tap a row to toggle selection, or tap "Scan" to audit 1 app immediately</span>
+      </div>
+
+      <div id="pkgSelectorGrid" class="metro-pkg-selector-grid"></div>
+    </section>
+
+    <!-- ==================== PIVOT 3: CONFIG ==================== -->
+    <section id="pane-config" class="metro-pane">
+      <div class="metro-config-grid">
+        <div class="metro-config-block">
+          <div class="metro-section-title">scan scope &amp; hardware optimization</div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">Scan all apps in scope at once</div>
+              <div class="metro-config-desc">Turn off to scan only manually selected packages.</div>
+            </div>
+            <label class="win8-switch">
+              <span class="win8-switch-state" id="lblScanAllAtOnce">On</span>
+              <input type="checkbox" id="cfgScanAllAtOnce" checked>
+              <span class="win8-switch-track"><span class="win8-switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">Package filter</div>
+              <div class="metro-config-desc">User apps (-3), all packages, or system apps (-s).</div>
+            </div>
+            <select id="cfgPackageScope" class="metro-select">
+              <option value="user">User Apps</option>
+              <option value="all">All Apps</option>
+              <option value="system">System Apps</option>
+            </select>
+          </div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">CPU worker threads</div>
+              <div class="metro-config-desc" id="hwConfigHint">Auto-adapts to CPU cores and available RAM.</div>
+            </div>
+            <select id="cfgWorkers" class="metro-select">
+              <option value="auto" selected>Auto (Hardware Adaptive)</option>
+              <option value="1">1 Worker (Low CPU)</option>
+              <option value="2">2 Workers</option>
+              <option value="3">3 Workers</option>
+              <option value="4">4 Workers (Fastest)</option>
+            </select>
+          </div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">Exclude clean apps in .JSON</div>
+              <div class="metro-config-desc">Only export apps with at least 1 tracker.</div>
+            </div>
+            <label class="win8-switch">
+              <span class="win8-switch-state" id="lblSkipCleanApps">Off</span>
+              <input type="checkbox" id="cfgSkipCleanApps">
+              <span class="win8-switch-track"><span class="win8-switch-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="metro-config-block">
+          <div class="metro-section-title">deep detection layers</div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">DEX bytecode &amp; SDK modules</div>
+              <div class="metro-config-desc">Inspects classes.dex string pool &amp; embedded SDK descriptors.</div>
+            </div>
+            <label class="win8-switch">
+              <span class="win8-switch-state" id="lblDeepDex">On</span>
+              <input type="checkbox" id="cfgDeepDex" checked>
+              <span class="win8-switch-track"><span class="win8-switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">Manifest components &amp; keys</div>
+              <div class="metro-config-desc">Checks Receivers, Services, Providers, Activities &amp; meta-data.</div>
+            </div>
+            <label class="win8-switch">
+              <span class="win8-switch-state" id="lblScanComponents">On</span>
+              <input type="checkbox" id="cfgScanComponents" checked>
+              <span class="win8-switch-track"><span class="win8-switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">Native libraries (.so)</div>
+              <div class="metro-config-desc">Checks lib/&lt;abi&gt;/lib*.so inside APKs.</div>
+            </div>
+            <label class="win8-switch">
+              <span class="win8-switch-state" id="lblScanNativeLibs">On</span>
+              <input type="checkbox" id="cfgScanNativeLibs" checked>
+              <span class="win8-switch-track"><span class="win8-switch-thumb"></span></span>
+            </label>
+          </div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">Tracking permissions</div>
+              <div class="metro-config-desc">Checks AD_ID, AdServices, location &amp; device identity access.</div>
+            </div>
+            <label class="win8-switch">
+              <span class="win8-switch-state" id="lblScanPermissions">On</span>
+              <input type="checkbox" id="cfgScanPermissions" checked>
+              <span class="win8-switch-track"><span class="win8-switch-thumb"></span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="metro-config-block" style="grid-column: 1 / -1;">
+          <div class="metro-section-title">appearance &amp; export</div>
+
+          <div class="metro-config-row">
+            <div>
+              <div class="metro-config-title">Material 3 color palette</div>
+              <div class="metro-config-desc">Windows 8 geometry with Material 3 tonal tokens.</div>
+            </div>
+            <select id="cfgPalette" class="metro-select">
+              <option value="m3-violet-dark">M3 Violet (Dark)</option>
+              <option value="m3-teal-dark">M3 Teal (Dark)</option>
+              <option value="m3-blue-dark">M3 Blue (Dark)</option>
+              <option value="m3-light">M3 Daylight (Light)</option>
+            </select>
+          </div>
+
+          <div class="metro-config-row" style="flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <div class="metro-config-title">JSON file path</div>
+              <div class="metro-config-desc">Also saved to $MODDIR/reports/latest_scan.json</div>
+            </div>
+            <input id="cfgExportPath" class="metro-input" type="text" value="/sdcard/Download/metro_tracker_report.json" style="max-width:400px;">
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button id="btnSaveConfig" class="metro-btn primary" type="button">Save Config</button>
+            <button id="btnResetConfig" class="metro-btn" type="button">Reset</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PIVOT 4: JSON ==================== -->
+    <section id="pane-json" class="metro-pane">
+      <div class="metro-filter-bar">
+        <button id="btnWriteJsonDevice" class="metro-btn primary" type="button">Save .JSON to Device</button>
+        <button id="btnCopyJsonClipboard" class="metro-btn tonal" type="button">Copy JSON</button>
+        <button id="btnDownloadJsonBlob" class="metro-btn" type="button">Download File</button>
+        <button id="btnLoadLastJson" class="metro-btn" type="button">Load Saved .JSON</button>
+      </div>
+
+      <div class="metro-subbar">
+        <span id="jsonStatusLabel">Report output</span>
+        <span id="jsonSizeLabel">0 KB</span>
+      </div>
+
+      <pre id="jsonPreviewBox" class="metro-json-box">{}</pre>
+    </section>
+  </div>
+
+  <!-- Windows 8 Right Flyout for App Details -->
+  <div id="appDetailBackdrop" class="metro-flyout-backdrop" role="dialog" aria-modal="true">
+    <aside class="metro-flyout">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:12px;color:var(--md-sys-color-primary);font-weight:600;">PACKAGE DETAILS</span>
+        <button id="btnCloseFlyout" class="metro-btn" type="button" style="height:30px;padding:0 12px;">Close</button>
+      </div>
+      <div id="flyoutContent"></div>
+    </aside>
+  </div>
+
+  <!-- Bottom Command Bar -->
+  <footer class="metro-appbar">
+    <div class="metro-appbar-group">
+      <button id="appbarRunScan" class="metro-btn primary" type="button">Run Scan</button>
+      <button id="appbarStopScan" class="metro-btn danger" type="button" style="display:none;">Stop</button>
+      <button id="appbarSaveJson" class="metro-btn tonal" type="button">Save .JSON</button>
+      <button id="appbarLoadJson" class="metro-btn" type="button">Load .JSON</button>
+    </div>
+    <div class="metro-appbar-author">kerneldroid [Official]</div>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

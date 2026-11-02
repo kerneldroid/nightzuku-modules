@@ -1,0 +1,13 @@
+id=metro-tracker-inspector
+name=Metro Tracker Inspector
+version=1.0.0
+versionCode=100
+author=kerneldroid [Official]
+description=Deep multi-layer tracker scanner for installed Android applications (Manifest components, DEX bytecode classes, native .so libraries, SDK metadata, and telemetry permissions) with a Windows 8 Metro UI in Material 3 palette and JSON export.
+banner=banner.png
+webui=webui
+action=action.sh
+usesShellBridge=true
+requireNightzuku=true
+minNightzukuApi=2
+minNightzukuVersion=13

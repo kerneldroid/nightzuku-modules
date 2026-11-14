@@ -19,3 +19,5 @@ Modules can be installed via the Nightzuku catalog (GitHub Topics search) or man
 2. Add `module.prop` with required fields (id, name, version, versionCode, author, description)
 3. Add `action.sh`, `banner.png`, and optional `webui/`
 4. Tag the repo with `adb-modules` topic on GitHub
+
+> **Note**: modules like *metro-tracker-inspector* are "vibe-coded". These are examples of the capabilities of ADB Modules, do with them what you want — port to other forks, change their code, etc. Nightzuku-guard will be in only 1 of these modules, for an example of a new feature. 
